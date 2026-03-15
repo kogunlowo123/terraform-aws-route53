@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>terraform-aws-route53 | Architecture</title>
+<style>
+:root{--ink:#0b0c0b;--accent:#c8420a;--surface:#141514;--border:#2a2b2a;--text:#d4d4d4;--muted:#8a8a8a;--card:#1a1b1a;--success:#2ea043;--warn:#d29922;--info:#388bfd}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--ink);color:var(--text);font-family:'SF Mono','Cascadia Code','Fira Code',monospace;font-size:15px;line-height:1.7;padding:0}
+a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
+.container{max-width:1200px;margin:0 auto;padding:2rem 1.5rem}
+header{border-bottom:2px solid var(--accent);padding:2rem 0;margin-bottom:3rem}
+header h1{font-size:1.8rem;color:#fff;margin-bottom:.5rem}
+header p{color:var(--muted);font-size:.95rem}
+h2{color:var(--accent);font-size:1.3rem;margin:2.5rem 0 1rem;padding-bottom:.5rem;border-bottom:1px solid var(--border)}
+h3{color:#fff;font-size:1.05rem;margin:1.5rem 0 .75rem}
+.badge{display:inline-block;padding:.2rem .6rem;border-radius:3px;font-size:.75rem;font-weight:600;margin-right:.5rem}
+.badge-accent{background:var(--accent);color:#fff}
+.badge-success{background:var(--success);color:#fff}
+.badge-info{background:var(--info);color:#fff}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;margin:1rem 0}
+.card{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:1.25rem}
+.card h4{color:#fff;margin-bottom:.5rem;font-size:.95rem}
+.card p{color:var(--muted);font-size:.85rem}
+.card .num{font-size:1.8rem;color:var(--accent);font-weight:700}
+.diagram{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:2rem;margin:1.5rem 0;overflow-x:auto}
+.flow{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:.5rem}
+.flow-box{background:var(--card);border:2px solid var(--accent);border-radius:6px;padding:.75rem 1.25rem;text-align:center;min-width:140px;font-size:.85rem;color:#fff}
+.flow-box.alt{border-color:var(--info)}
+.flow-box.green{border-color:var(--success)}
+.flow-box.warn{border-color:var(--warn)}
+.flow-arrow{color:var(--accent);font-size:1.5rem;font-weight:700}
+.table-wrap{overflow-x:auto;margin:1rem 0}
+table{width:100%;border-collapse:collapse;font-size:.85rem}
+th{background:var(--surface);color:var(--accent);text-align:left;padding:.75rem;border:1px solid var(--border)}
+td{padding:.75rem;border:1px solid var(--border);color:var(--text)}
+tr:hover td{background:var(--surface)}
+.checklist{list-style:none;margin:1rem 0}
+.checklist li{padding:.4rem 0;padding-left:1.5rem;position:relative;font-size:.9rem}
+.checklist li::before{content:"[ ]";position:absolute;left:0;color:var(--accent);font-weight:700}
+code{background:var(--surface);padding:.15rem .4rem;border-radius:3px;font-size:.85rem;color:var(--accent)}
+pre{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:1.25rem;overflow-x:auto;font-size:.85rem;line-height:1.5;margin:1rem 0}
+.section{margin-bottom:2rem}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+@media(max-width:768px){.grid-2{grid-template-columns:1fr}.flow{flex-direction:column}.flow-arrow{transform:rotate(90deg)}}
+footer{border-top:1px solid var(--border);margin-top:3rem;padding:2rem 0;color:var(--muted);font-size:.8rem;text-align:center}
+</style>
+</head>
+<body>
+<div class="container">
+
+<header>
+<h1>terraform-aws-route53</h1>
+<p>Architecture Document &mdash; AWS Route53 DNS Management Module</p>
+<p><span class="badge badge-accent">Terraform &ge; 1.5.0</span><span class="badge badge-info">AWS Provider &ge; 5.0</span><span class="badge badge-success">MIT License</span></p>
+</header>
+
+<!-- Executive Summary -->
+<section class="section">
+<h2>Executive Summary</h2>
+<p>This Terraform module provides comprehensive DNS management on AWS Route53, covering public and private hosted zones, DNS records with advanced routing policies (weighted, latency, failover, geolocation), health checks, DNSSEC zone signing, query logging, and Route53 Resolver endpoints for hybrid DNS resolution. It supports the full spectrum of DNS operations needed for production environments, from simple A records to complex multi-region traffic routing with health-based failover.</p>
+</section>
+
+<!-- Overview Cards -->
+<section class="section">
+<h2>Overview</h2>
+<div class="cards">
+<div class="card"><div class="num">8</div><h4>Resource Types</h4><p>Zones, records, health checks, DNSSEC, query logging, resolvers, rules, associations</p></div>
+<div class="card"><div class="num">5</div><h4>Routing Policies</h4><p>Simple, Weighted, Latency, Failover, Geolocation</p></div>
+<div class="card"><div class="num">4</div><h4>Health Check Types</h4><p>HTTP/HTTPS, TCP, Calculated, CloudWatch Alarm</p></div>
+<div class="card"><div class="num">11</div><h4>Outputs</h4><p>Zone IDs/ARNs, name servers, record FQDNs, health check IDs, resolver endpoints</p></div>
+</div>
+</section>
+
+<!-- Architecture Diagram -->
+<section class="section">
+<h2>Architecture Diagram</h2>
+<div class="diagram">
+<h3 style="text-align:center;margin-bottom:1.5rem;color:var(--muted)">DNS Zone Management</h3>
+<div class="flow">
+<div class="flow-box">Route53</div>
+<div class="flow-arrow">&rarr;</div>
+<div class="flow-box alt">Public<br>Hosted Zones</div>
+<div class="flow-arrow">&rarr;</div>
+<div class="flow-box">DNS Records<br>(A, AAAA, CNAME...)</div>
+</div>
+<div class="flow" style="margin-top:1rem">
+<div class="flow-box">Route53</div>
+<div class="flow-arrow">&rarr;</div>
+<div class="flow-box green">Private<br>Hosted Zones</div>
+<div class="flow-arrow">&rarr;</div>
+<div class="flow-box green">VPC<br>Association</div>
+</div>
+<h3 style="text-align:center;margin:2rem 0 1.5rem;color:var(--muted)">Routing Policies &amp; Health Checks</h3>
+<div class="flow">
+<div class="flow-box">DNS Query</div>
+<div class="flow-arrow">&rarr;</div>
+<div class="flow-box warn">Routing<br>Policy</div>
+<div class="flow-arrow">&rarr;</div>
+<div class="flow-box alt">Health<br>Check</div>
+<div class="flow-arrow">&rarr;</div>
+<div class="flow-box green">Healthy<br>Endpoint</div>
+</div>
+<h3 style="text-align:center;margin:2rem 0 1.5rem;color:var(--muted)">Hybrid DNS Resolution</h3>
+<div class="flow">
+<div class="flow-box">On-Premises<br>DNS</div>
+<div class="flow-arrow">&rarr;</div>
+<div class="flow-box alt">Inbound<br>Resolver</div>
+<div class="flow-arrow">&rarr;</div>
+<div class="flow-box">Route53<br>Private Zones</div>
+</div>
+<div class="flow" style="margin-top:1rem">
+<div class="flow-box">VPC<br>Workloads</div>
+<div class="flow-arrow">&rarr;</div>
+<div class="flow-box alt">Outbound<br>Resolver</div>
+<div class="flow-arrow">&rarr;</div>
+<div class="flow-box warn">Resolver<br>Rules</div>
+<div class="flow-arrow">&rarr;</div>
+<div class="flow-box">On-Premises<br>DNS</div>
+</div>
+<h3 style="text-align:center;margin:2rem 0 1.5rem;color:var(--muted)">Security &amp; Logging</h3>
+<div class="flow">
+<div class="flow-box warn">DNSSEC<br>Signing</div>
+<div class="flow-box warn">KMS<br>Signing Key</div>
+<div class="flow-box alt">Query<br>Logging</div>
+<div class="flow-box alt">CloudWatch<br>Logs</div>
+</div>
+</div>
+</section>
+
+<!-- Component Breakdown -->
+<section class="section">
+<h2>Component Breakdown</h2>
+<div class="table-wrap">
+<table>
+<tr><th>Resource</th><th>Purpose</th></tr>
+<tr><td><code>aws_route53_zone.public</code></td><td>Internet-facing DNS hosted zones with configurable comments and force_destroy</td></tr>
+<tr><td><code>aws_route53_zone.private</code></td><td>VPC-scoped private DNS zones with multi-VPC associations</td></tr>
+<tr><td><code>aws_route53_record.simple</code></td><td>Standard DNS records with TTL, supporting weighted/latency/failover/geolocation routing</td></tr>
+<tr><td><code>aws_route53_record.alias</code></td><td>Alias records pointing to AWS resources (ALB, CloudFront, S3, etc.) with routing policies</td></tr>
+<tr><td><code>aws_route53_health_check.this</code></td><td>HTTP/HTTPS/TCP health checks with configurable thresholds, intervals, regions, and SNI</td></tr>
+<tr><td><code>aws_route53_key_signing_key.this</code></td><td>DNSSEC key signing key (KSK) using KMS for zone signing</td></tr>
+<tr><td><code>aws_route53_hosted_zone_dnssec.this</code></td><td>Enables DNSSEC signing on hosted zones</td></tr>
+<tr><td><code>aws_route53_query_log.this</code></td><td>DNS query logging to CloudWatch Logs for audit and troubleshooting</td></tr>
+<tr><td><code>aws_route53_resolver_endpoint.this</code></td><td>Inbound/outbound resolver endpoints for hybrid DNS (on-prem to AWS and back)</td></tr>
+<tr><td><code>aws_route53_resolver_rule.this</code></td><td>Conditional forwarding rules routing specific domains to target DNS servers</td></tr>
+<tr><td><code>aws_route53_resolver_rule_association.this</code></td><td>Associates resolver rules with VPCs for DNS forwarding activation</td></tr>
+</table>
+</div>
+</section>
+
+<!-- Data Flow -->
+<section class="section">
+<h2>Data Flow</h2>
+<div class="diagram">
+<ol style="list-style:decimal inside;color:var(--text);font-size:.9rem;line-height:2">
+<li><strong>Public DNS queries</strong> resolve against public hosted zones managed by Route53 global anycast network</li>
+<li><strong>Private DNS queries</strong> from within associated VPCs resolve against private hosted zones</li>
+<li><strong>Routing policies</strong> determine which record to return: simple (direct), weighted (traffic split), latency (nearest region), failover (primary/secondary), or geolocation (by location)</li>
+<li><strong>Health checks</strong> continuously monitor endpoints; unhealthy records are excluded from responses</li>
+<li><strong>Alias records</strong> resolve directly to AWS resources with zero TTL for instant failover</li>
+<li><strong>DNSSEC</strong> signs zone responses with KMS-managed keys for DNS response integrity verification</li>
+<li><strong>Query logging</strong> streams all DNS queries to CloudWatch Logs for analysis</li>
+<li><strong>Inbound resolver</strong> accepts DNS queries from on-premises networks and resolves them against Route53</li>
+<li><strong>Outbound resolver</strong> forwards queries matching resolver rules to on-premises or external DNS servers</li>
+<li><strong>Resolver rules</strong> define per-domain forwarding targets and are associated with specific VPCs</li>
+</ol>
+</div>
+</section>
+
+<!-- Security Controls -->
+<section class="section">
+<h2>Security Controls</h2>
+<div class="grid-2">
+<div class="card">
+<h4>DNSSEC Signing</h4>
+<p>Zone signing with KMS-managed Key Signing Keys (KSK) ensures DNS response integrity and prevents spoofing.</p>
+</div>
+<div class="card">
+<h4>Private Hosted Zones</h4>
+<p>VPC-scoped DNS zones prevent internal DNS records from leaking to the public internet.</p>
+</div>
+<div class="card">
+<h4>Health Check Monitoring</h4>
+<p>Continuous endpoint monitoring with configurable failure thresholds, intervals, and multi-region checks.</p>
+</div>
+<div class="card">
+<h4>Query Logging</h4>
+<p>All DNS queries logged to CloudWatch for security analysis, compliance auditing, and troubleshooting.</p>
+</div>
+<div class="card">
+<h4>Resolver Security Groups</h4>
+<p>Resolver endpoints are secured by security groups controlling which networks can send DNS queries.</p>
+</div>
+<div class="card">
+<h4>Failover Routing</h4>
+<p>Automatic failover to secondary endpoints when primary health checks fail, ensuring availability.</p>
+</div>
+</div>
+</section>
+
+<!-- Industry Adaptation -->
+<section class="section">
+<h2>Industry Adaptation</h2>
+<div class="table-wrap">
+<table>
+<tr><th>Industry</th><th>Use Case</th><th>Configuration Focus</th></tr>
+<tr><td>Global SaaS</td><td>Multi-region latency-based routing</td><td>Latency routing policy, health checks per region, alias to ALBs</td></tr>
+<tr><td>Enterprise Hybrid</td><td>On-prem to cloud DNS integration</td><td>Resolver endpoints (inbound + outbound), forwarding rules, private zones</td></tr>
+<tr><td>Financial Services</td><td>Secure DNS with audit trail</td><td>DNSSEC enabled, query logging, failover routing, calculated health checks</td></tr>
+<tr><td>Media / CDN</td><td>Geographic content routing</td><td>Geolocation routing by continent/country, alias to CloudFront distributions</td></tr>
+<tr><td>E-Commerce</td><td>Blue/green and canary deployments</td><td>Weighted routing with adjustable traffic split, health checks on each target</td></tr>
+</table>
+</div>
+</section>
+
+<!-- Production Readiness Checklist -->
+<section class="section">
+<h2>Production Readiness Checklist</h2>
+<ul class="checklist">
+<li>Enable DNSSEC on public hosted zones for response integrity</li>
+<li>Configure health checks for all failover and weighted records</li>
+<li>Enable query logging on critical zones for audit compliance</li>
+<li>Use alias records for AWS resources (avoids unnecessary DNS hops)</li>
+<li>Associate private zones with all relevant VPCs</li>
+<li>Set appropriate TTL values (lower for failover, higher for stable records)</li>
+<li>Configure calculated health checks for complex availability logic</li>
+<li>Deploy resolver endpoints in multiple AZs for resilience</li>
+<li>Set force_destroy = false on production hosted zones</li>
+<li>Tag all resources for governance and cost tracking</li>
+<li>Verify NS record delegation at registrar for public zones</li>
+<li>Test failover scenarios by simulating health check failures</li>
+</ul>
+</section>
+
+<!-- Config Reference -->
+<section class="section">
+<h2>Configuration Reference</h2>
+<h3>Key Variables</h3>
+<div class="table-wrap">
+<table>
+<tr><th>Variable</th><th>Type</th><th>Default</th><th>Description</th></tr>
+<tr><td><code>name</code></td><td>string</td><td>""</td><td>Name prefix for resources</td></tr>
+<tr><td><code>public_zones</code></td><td>map(object)</td><td>{}</td><td>Map of public hosted zone configs (comment, force_destroy, tags)</td></tr>
+<tr><td><code>private_zones</code></td><td>map(object)</td><td>{}</td><td>Map of private zones with VPC IDs and optional region</td></tr>
+<tr><td><code>records</code></td><td>map(object)</td><td>{}</td><td>Map of DNS records with zone_key, type, TTL, records/alias, routing policy</td></tr>
+<tr><td><code>health_checks</code></td><td>map(object)</td><td>{}</td><td>Map of health check configs (HTTPS/TCP, thresholds, intervals, SNI)</td></tr>
+<tr><td><code>enable_dnssec</code></td><td>map(bool)</td><td>{}</td><td>Map of zone keys to enable DNSSEC signing</td></tr>
+<tr><td><code>dnssec_kms_key_arns</code></td><td>map(string)</td><td>{}</td><td>Map of zone keys to KMS key ARNs for DNSSEC</td></tr>
+<tr><td><code>query_logging</code></td><td>map(object)</td><td>{}</td><td>Map of zone keys to CloudWatch log group ARNs</td></tr>
+<tr><td><code>resolver_endpoints</code></td><td>map(object)</td><td>{}</td><td>INBOUND/OUTBOUND resolver endpoints with SGs and IP addresses</td></tr>
+<tr><td><code>resolver_rules</code></td><td>map(object)</td><td>{}</td><td>Forwarding rules with domain, target IPs, and VPC associations</td></tr>
+</table>
+</div>
+
+<h3>Key Outputs</h3>
+<div class="table-wrap">
+<table>
+<tr><th>Output</th><th>Description</th></tr>
+<tr><td><code>public_zone_ids / public_zone_arns</code></td><td>Maps of public zone names to IDs and ARNs</td></tr>
+<tr><td><code>public_zone_name_servers</code></td><td>Name servers for NS delegation at registrar</td></tr>
+<tr><td><code>private_zone_ids / private_zone_arns</code></td><td>Maps of private zone names to IDs and ARNs</td></tr>
+<tr><td><code>record_fqdns</code></td><td>Merged map of all record keys to their FQDNs</td></tr>
+<tr><td><code>health_check_ids / health_check_arns</code></td><td>Maps of health check names to IDs and ARNs</td></tr>
+<tr><td><code>resolver_endpoint_ids / resolver_endpoint_ips</code></td><td>Resolver endpoint identifiers and IP addresses</td></tr>
+<tr><td><code>resolver_rule_ids / resolver_rule_arns</code></td><td>Resolver rule identifiers and ARNs</td></tr>
+<tr><td><code>zone_ids</code></td><td>Merged map of all zone names to IDs</td></tr>
+</table>
+</div>
+</section>
+
+<!-- Deployment -->
+<section class="section">
+<h2>Deployment</h2>
+<pre>
+module "route53" {
+  source = "path/to/terraform-aws-route53"
+
+  name = "my-dns"
+
+  public_zones = {
+    "example.com" = {
+      comment = "Primary domain"
+    }
+  }
+
+  private_zones = {
+    "internal.example.com" = {
+      comment = "Internal services"
+      vpc_ids = ["vpc-abc123"]
+    }
+  }
+
+  records = {
+    www = {
+      zone_key = "example.com"
+      name     = "www.example.com"
+      type     = "A"
+      records  = ["10.0.1.100"]
+    }
+    api-primary = {
+      zone_key       = "example.com"
+      name           = "api.example.com"
+      type           = "A"
+      records        = ["10.0.1.200"]
+      set_identifier = "primary"
+      failover       = { type = "PRIMARY" }
+      health_check_id = module.route53.health_check_ids["api-check"]
+    }
+  }
+
+  health_checks = {
+    api-check = {
+      type              = "HTTPS"
+      fqdn              = "api.example.com"
+      port              = 443
+      resource_path     = "/health"
+      failure_threshold = 3
+      request_interval  = 30
+    }
+  }
+
+  tags = { Environment = "production" }
+}
+</pre>
+<pre>
+terraform init
+terraform plan
+terraform apply
+</pre>
+</section>
+
+<!-- Links -->
+<section class="section">
+<h2>Links</h2>
+<ul style="list-style:none;line-height:2.2">
+<li><a href="https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/">Amazon Route53 Documentation</a></li>
+<li><a href="https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/resolver.html">Route53 Resolver</a></li>
+<li><a href="https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/domain-name-system-sec-extensions.html">DNSSEC Signing</a></li>
+<li><a href="https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/route53_zone">Terraform: aws_route53_zone</a></li>
+<li><a href="https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/route53_record">Terraform: aws_route53_record</a></li>
+</ul>
+</section>
+
+<footer>
+<p>terraform-aws-route53 &middot; Architecture Document</p>
+<p>Generated for reference purposes. Review all configurations before production deployment.</p>
+</footer>
+
+</div>
+</body>
+</html>
