@@ -1,25 +1,17 @@
-################################################################################
-# General
-################################################################################
-
 variable "name" {
-  description = "Name prefix for resources"
+  description = "Name prefix for resources."
   type        = string
   default     = ""
 }
 
 variable "tags" {
-  description = "Tags to apply to all resources"
+  description = "Tags to apply to all resources."
   type        = map(string)
   default     = {}
 }
 
-################################################################################
-# Hosted Zones
-################################################################################
-
 variable "public_zones" {
-  description = "Map of public hosted zones to create"
+  description = "Map of public hosted zones to create."
   type = map(object({
     comment       = optional(string, "")
     force_destroy = optional(bool, false)
@@ -29,7 +21,7 @@ variable "public_zones" {
 }
 
 variable "private_zones" {
-  description = "Map of private hosted zones to create"
+  description = "Map of private hosted zones to create."
   type = map(object({
     comment       = optional(string, "")
     vpc_ids       = list(string)
@@ -40,63 +32,41 @@ variable "private_zones" {
   default = {}
 }
 
-################################################################################
-# DNS Records
-################################################################################
-
 variable "records" {
-  description = "Map of DNS records to create"
+  description = "Map of DNS records to create."
   type = map(object({
     zone_key = string
     name     = string
     type     = string
     ttl      = optional(number, 300)
     records  = optional(list(string), [])
-
-    # Alias record
     alias = optional(object({
       name                   = string
       zone_id                = string
       evaluate_target_health = optional(bool, true)
     }))
-
-    # Routing policy
     set_identifier = optional(string)
-
-    # Weighted routing
     weighted = optional(object({
       weight = number
     }))
-
-    # Latency routing
     latency = optional(object({
       region = string
     }))
-
-    # Failover routing
     failover = optional(object({
-      type = string # PRIMARY or SECONDARY
+      type = string
     }))
-
-    # Geolocation routing
     geolocation = optional(object({
       continent   = optional(string)
       country     = optional(string)
       subdivision = optional(string)
     }))
-
-    # Health check association
     health_check_id = optional(string)
   }))
   default = {}
 }
 
-################################################################################
-# Health Checks
-################################################################################
-
 variable "health_checks" {
-  description = "Map of Route53 health checks to create"
+  description = "Map of Route53 health checks to create."
   type = map(object({
     type                            = optional(string, "HTTPS")
     fqdn                            = optional(string)
@@ -112,56 +82,39 @@ variable "health_checks" {
     regions                         = optional(list(string))
     insufficient_data_health_status = optional(string)
     disabled                        = optional(bool, false)
-
-    # Calculated health check
-    child_health_checks = optional(list(string))
-    child_healthcheck_threshold = optional(number)
-
-    # CloudWatch alarm health check
-    cloudwatch_alarm_name   = optional(string)
-    cloudwatch_alarm_region = optional(string)
-
-    tags = optional(map(string), {})
+    child_health_checks             = optional(list(string))
+    child_healthcheck_threshold     = optional(number)
+    cloudwatch_alarm_name           = optional(string)
+    cloudwatch_alarm_region         = optional(string)
+    tags                            = optional(map(string), {})
   }))
   default = {}
 }
 
-################################################################################
-# DNSSEC
-################################################################################
-
 variable "enable_dnssec" {
-  description = "Map of zone keys to enable DNSSEC signing"
+  description = "Map of zone keys to enable DNSSEC signing."
   type        = map(bool)
   default     = {}
 }
 
 variable "dnssec_kms_key_arns" {
-  description = "Map of zone keys to KMS key ARNs for DNSSEC"
+  description = "Map of zone keys to KMS key ARNs for DNSSEC."
   type        = map(string)
   default     = {}
 }
 
-################################################################################
-# Query Logging
-################################################################################
-
 variable "query_logging" {
-  description = "Map of zone keys to enable query logging"
+  description = "Map of zone keys to enable query logging."
   type = map(object({
     cloudwatch_log_group_arn = string
   }))
   default = {}
 }
 
-################################################################################
-# Resolver Endpoints
-################################################################################
-
 variable "resolver_endpoints" {
-  description = "Map of Route53 Resolver endpoints to create"
+  description = "Map of Route53 Resolver endpoints to create."
   type = map(object({
-    direction          = string # INBOUND or OUTBOUND
+    direction          = string
     security_group_ids = list(string)
     ip_addresses = list(object({
       subnet_id = string
@@ -174,7 +127,7 @@ variable "resolver_endpoints" {
 }
 
 variable "resolver_rules" {
-  description = "Map of Route53 Resolver rules to create"
+  description = "Map of Route53 Resolver rules to create."
   type = map(object({
     domain_name          = string
     rule_type            = optional(string, "FORWARD")

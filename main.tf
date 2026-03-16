@@ -9,7 +9,7 @@ resource "aws_route53_zone" "public" {
   comment       = each.value.comment
   force_destroy = each.value.force_destroy
 
-  tags = merge(local.common_tags, each.value.tags)
+  tags = merge(var.tags, each.value.tags)
 }
 
 ################################################################################
@@ -32,7 +32,7 @@ resource "aws_route53_zone" "private" {
     }
   }
 
-  tags = merge(local.common_tags, each.value.tags)
+  tags = merge(var.tags, each.value.tags)
 }
 
 ################################################################################
@@ -40,9 +40,12 @@ resource "aws_route53_zone" "private" {
 ################################################################################
 
 resource "aws_route53_record" "simple" {
-  for_each = local.simple_records
+  for_each = { for k, v in var.records : k => v if v.alias == null }
 
-  zone_id = local.zone_ids[each.value.zone_key]
+  zone_id = merge(
+    { for k, v in aws_route53_zone.public : k => v.zone_id },
+    { for k, v in aws_route53_zone.private : k => v.zone_id },
+  )[each.value.zone_key]
   name    = each.value.name
   type    = each.value.type
   ttl     = each.value.ttl
@@ -92,11 +95,14 @@ resource "aws_route53_record" "simple" {
 ################################################################################
 
 resource "aws_route53_record" "alias" {
-  for_each = local.alias_records
+  for_each = { for k, v in var.records : k => v if v.alias != null }
 
-  zone_id = local.zone_ids[each.value.zone_key]
-  name    = each.value.name
-  type    = each.value.type
+  zone_id = merge(
+    { for k, v in aws_route53_zone.public : k => v.zone_id },
+    { for k, v in aws_route53_zone.private : k => v.zone_id },
+  )[each.value.zone_key]
+  name = each.value.name
+  type = each.value.type
 
   set_identifier = each.value.set_identifier
 
@@ -171,7 +177,7 @@ resource "aws_route53_health_check" "this" {
   cloudwatch_alarm_name   = each.value.cloudwatch_alarm_name
   cloudwatch_alarm_region = each.value.cloudwatch_alarm_region
 
-  tags = merge(local.common_tags, { Name = each.key }, each.value.tags)
+  tags = merge(var.tags, { Name = each.key }, each.value.tags)
 }
 
 ################################################################################
@@ -181,7 +187,10 @@ resource "aws_route53_health_check" "this" {
 resource "aws_route53_key_signing_key" "this" {
   for_each = var.enable_dnssec
 
-  hosted_zone_id             = local.zone_ids[each.key]
+  hosted_zone_id = merge(
+    { for k, v in aws_route53_zone.public : k => v.zone_id },
+    { for k, v in aws_route53_zone.private : k => v.zone_id },
+  )[each.key]
   key_management_service_arn = var.dnssec_kms_key_arns[each.key]
   name                       = "${each.key}-ksk"
 }
@@ -189,7 +198,10 @@ resource "aws_route53_key_signing_key" "this" {
 resource "aws_route53_hosted_zone_dnssec" "this" {
   for_each = var.enable_dnssec
 
-  hosted_zone_id = local.zone_ids[each.key]
+  hosted_zone_id = merge(
+    { for k, v in aws_route53_zone.public : k => v.zone_id },
+    { for k, v in aws_route53_zone.private : k => v.zone_id },
+  )[each.key]
 
   depends_on = [aws_route53_key_signing_key.this]
 }
@@ -201,7 +213,10 @@ resource "aws_route53_hosted_zone_dnssec" "this" {
 resource "aws_route53_query_log" "this" {
   for_each = var.query_logging
 
-  zone_id                  = local.zone_ids[each.key]
+  zone_id = merge(
+    { for k, v in aws_route53_zone.public : k => v.zone_id },
+    { for k, v in aws_route53_zone.private : k => v.zone_id },
+  )[each.key]
   cloudwatch_log_group_arn = each.value.cloudwatch_log_group_arn
 }
 
@@ -227,7 +242,7 @@ resource "aws_route53_resolver_endpoint" "this" {
     }
   }
 
-  tags = merge(local.common_tags, each.value.tags)
+  tags = merge(var.tags, each.value.tags)
 }
 
 ################################################################################
@@ -251,16 +266,16 @@ resource "aws_route53_resolver_rule" "this" {
     }
   }
 
-  tags = merge(local.common_tags, each.value.tags)
+  tags = merge(var.tags, each.value.tags)
 }
 
 resource "aws_route53_resolver_rule_association" "this" {
   for_each = { for pair in flatten([
     for rk, rv in var.resolver_rules : [
       for vpc_id in rv.vpc_ids : {
-        key     = "${rk}-${vpc_id}"
+        key      = "${rk}-${vpc_id}"
         rule_key = rk
-        vpc_id  = vpc_id
+        vpc_id   = vpc_id
       }
     ]
   ]) : pair.key => pair }
